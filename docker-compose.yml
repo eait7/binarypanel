@@ -1,0 +1,74 @@
+services:
+  # ── Network Manager (Reverse Proxy + Auto-SSL) ──
+  caddy:
+    image: caddy:latest
+    container_name: binarypanel-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy_config:/etc/caddy
+      - ./caddy_data:/data
+    environment:
+      - CADDY_ADMIN=0.0.0.0:2019
+    networks:
+      - binarypanel
+
+  # ── Storage Manager (File Browser UI) ──
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: binarypanel-filebrowser
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    volumes:
+      - ./storage:/srv
+      - ./filebrowser/.filebrowser.json:/.filebrowser.json
+      - ./filebrowser/database:/database
+    networks:
+      - binarypanel
+
+  # ── Deployment Manager (Container UI) ──
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: binarypanel-portainer
+    restart: unless-stopped
+    ports:
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./portainer_data:/data
+    networks:
+      - binarypanel
+
+  # ── BinaryPanel Dashboard (Custom Management UI) ──
+  dashboard:
+    build: ./dashboard
+    container_name: binarypanel-dashboard
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      - CADDY_API=http://caddy:2019
+      - PORTAINER_URL=https://portainer:9443
+      - FILEBROWSER_URL=http://localhost:8090
+      - PORTAINER_EXTERNAL_URL=https://localhost:9443
+      - BINARYPANEL_PORT=9000
+      - BINARYPANEL_SECRET=${BINARYPANEL_SECRET:-changeme-in-production}
+      - BINARYPANEL_USERNAME=${BINARYPANEL_USERNAME:-admin}
+      - BINARYPANEL_PASSWORD=${BINARYPANEL_PASSWORD:-admin}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./dashboard_data:/data
+      - ./:/app/host_binarypanel
+    depends_on:
+      - caddy
+      - portainer
+      - filebrowser
+    networks:
+      - binarypanel
+
+networks:
+  binarypanel:
+    driver: bridge

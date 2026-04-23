@@ -1,0 +1,21 @@
+const SMTPProviders = {
+    "gmail": { name: "Gmail", host: "smtp.gmail.com", port: "587", secure: false },
+    "resend": { name: "Resend", host: "smtp.resend.com", port: "465", secure: true },
+    "amazon_ses": { name: "Amazon SES", host: "email-smtp.us-east-1.amazonaws.com", port: "587", secure: false },
+    "sendgrid": { name: "SendGrid", host: "smtp.sendgrid.net", port: "587", secure: false },
+    "mailgun": { name: "Mailgun", host: "smtp.mailgun.org", port: "587", secure: false },
+    "postmark": { name: "Postmark", host: "smtp-broadcasts.postmarkapp.com", port: "587", secure: false },
+    "brevo": { name: "Brevo / Sendinblue", host: "smtp-relay.brevo.com", port: "587", secure: false },
+    "mailjet": { name: "Mailjet", host: "in-v3.mailjet.com", port: "587", secure: false },
+    "sparkpost": { name: "SparkPost", host: "smtp.sparkpostmail.com", port: "587", secure: false },
+    "elastic_email": { name: "Elastic Email", host: "smtp.elasticemail.com", port: "2525", secure: false },
+    "mailtrap": { name: "Mailtrap Sandbox", host: "sandbox.smtp.mailtrap.io", port: "2525", secure: false },
+    "zoho": { name: "Zoho Mail", host: "smtp.zoho.com", port: "465", secure: true },
+    "smtp_com": { name: "SMTP.com", host: "send.smtp.com", port: "2525", secure: false },
+    "fastmail": { name: "Fastmail", host: "smtp.fastmail.com", port: "465", secure: true },
+    "outlook": { name: "Outlook / Office365", host: "smtp.office365.com", port: "587", secure: false },
+    "mandrill": { name: "Mandrill / Mailchimp", host: "smtp.mandrillapp.com", port: "587", secure: false },
+    "zeptomail": { name: "ZeptoMail", host: "smtp.zeptomail.com", port: "587", secure: false },
+    "sendpulse": { name: "SendPulse", host: "smtp-pulse.com", port: "2525", secure: false },
+    "mailersend": { name: "MailerSend", host: "smtp.mailersend.net", port: "587", secure: false }
+};
