@@ -93,10 +93,6 @@ const BinaryPanel = {
                     });
                     status.textContent = "✅ " + res.message;
                     status.style.color = "#10b981";
-                    
-                    setTimeout(() => {
-                         this.navigate('containers');
-                    }, 4000);
                 } catch (err) {
                     status.textContent = "❌ " + err.message;
                     status.style.color = "#ef4444";
