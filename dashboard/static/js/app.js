@@ -402,6 +402,9 @@ const BinaryPanel = {
             case 'system':
                 SystemModule.loadStats();
                 break;
+            case 'settings':
+                SecurityModule.loadBlockedIPs();
+                break;
         }
     },
 

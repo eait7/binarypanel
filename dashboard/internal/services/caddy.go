@@ -22,6 +22,10 @@ type DomainInfo struct {
 	Upstream string   `json:"upstream"`
 	Type     string   `json:"type"` // "reverse_proxy" or "file_server"
 	TLS      bool     `json:"tls"`
+	// Security status fields
+	SecurityScore  int  `json:"security_score"`
+	HeadersEnabled bool `json:"headers_enabled"`
+	IPRestricted   bool `json:"ip_restricted"`
 }
 
 // CaddyRoute represents a route in Caddy's JSON config.
@@ -324,5 +328,180 @@ func (s *CaddyService) ReloadConfig(config map[string]interface{}) error {
 		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("caddy reload error (%d): %s", resp.StatusCode, string(respBody))
 	}
+	return nil
+}
+
+// ApplySecurityConfig applies security headers and IP restrictions to a Caddy route.
+func (s *CaddyService) ApplySecurityConfig(routeIndex int, cfg DomainSecurityConfig) error {
+	// First, get the current route to rebuild its subroute handlers
+	resp, err := s.client.Get(fmt.Sprintf("%s/config/apps/http/servers/srv0/routes/%d/handle/0/routes", s.apiURL, routeIndex))
+	if err != nil {
+		return fmt.Errorf("failed to read route: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var existingRoutes []map[string]interface{}
+	if resp.StatusCode == 200 {
+		body, _ := io.ReadAll(resp.Body)
+		json.Unmarshal(body, &existingRoutes)
+	}
+
+	// Filter out any existing security-related routes (headers handler and IP block responder)
+	var cleanRoutes []map[string]interface{}
+	for _, route := range existingRoutes {
+		if handles, ok := route["handle"].([]interface{}); ok {
+			keep := true
+			for _, h := range handles {
+				if hm, ok := h.(map[string]interface{}); ok {
+					handler, _ := hm["handler"].(string)
+					if handler == "headers" {
+						// Check if this is our security headers handler (has marker)
+						if respH, ok := hm["response"].(map[string]interface{}); ok {
+							if set, ok := respH["set"].(map[string]interface{}); ok {
+								if _, ok := set["X-Binarypanel-Security"]; ok {
+									keep = false
+								}
+							}
+						}
+					} else if handler == "static_response" {
+						// IP block response handler
+						if code, ok := hm["status_code"].(string); ok && code == "403" {
+							keep = false
+						}
+						if code, ok := hm["status_code"].(float64); ok && int(code) == 403 {
+							keep = false
+						}
+					}
+				}
+			}
+			if !keep {
+				continue
+			}
+		}
+		cleanRoutes = append(cleanRoutes, route)
+	}
+
+	// Build new security routes to prepend
+	var securityRoutes []map[string]interface{}
+
+	// 1. IP Blacklist route (respond 403 for blocked IPs)
+	if len(cfg.IPBlacklist) > 0 {
+		ipBlockRoute := map[string]interface{}{
+			"match": []map[string]interface{}{
+				{"remote_ip": map[string]interface{}{"ranges": cfg.IPBlacklist}},
+			},
+			"handle": []map[string]interface{}{
+				{
+					"handler":     "static_response",
+					"status_code": "403",
+					"body":        "Access denied by BinaryPanel security policy.",
+				},
+			},
+			"terminal": true,
+		}
+		securityRoutes = append(securityRoutes, ipBlockRoute)
+	}
+
+	// 2. IP Whitelist route (respond 403 for anything NOT in the whitelist)
+	if len(cfg.IPWhitelist) > 0 {
+		ipWhitelistRoute := map[string]interface{}{
+			"match": []map[string]interface{}{
+				{
+					"not": []map[string]interface{}{
+						{"remote_ip": map[string]interface{}{"ranges": cfg.IPWhitelist}},
+					},
+				},
+			},
+			"handle": []map[string]interface{}{
+				{
+					"handler":     "static_response",
+					"status_code": "403",
+					"body":        "Access denied by BinaryPanel security policy.",
+				},
+			},
+			"terminal": true,
+		}
+		securityRoutes = append(securityRoutes, ipWhitelistRoute)
+	}
+
+	// 3. Security headers route
+	headerSet := make(map[string][]string)
+
+	// Marker header so we can identify our injected headers later
+	headerSet["X-Binarypanel-Security"] = []string{"active"}
+
+	if cfg.HSTSEnabled {
+		hstsValue := fmt.Sprintf("max-age=%d", cfg.HSTSMaxAge)
+		if cfg.HSTSSubdomains {
+			hstsValue += "; includeSubDomains"
+		}
+		if cfg.HSTSPreload {
+			hstsValue += "; preload"
+		}
+		headerSet["Strict-Transport-Security"] = []string{hstsValue}
+	}
+
+	if cfg.XFrameOptions != "" {
+		headerSet["X-Frame-Options"] = []string{cfg.XFrameOptions}
+	}
+
+	if cfg.XContentTypeOpts {
+		headerSet["X-Content-Type-Options"] = []string{"nosniff"}
+	}
+
+	if cfg.ReferrerPolicy != "" {
+		headerSet["Referrer-Policy"] = []string{cfg.ReferrerPolicy}
+	}
+
+	if cfg.PermissionsPolicy != "" {
+		headerSet["Permissions-Policy"] = []string{cfg.PermissionsPolicy}
+	}
+
+	if cfg.CSPEnabled && cfg.CSPValue != "" {
+		headerSet["Content-Security-Policy"] = []string{cfg.CSPValue}
+	}
+
+	// Only add headers route if there's something beyond the marker
+	if len(headerSet) > 1 {
+		headersRoute := map[string]interface{}{
+			"handle": []map[string]interface{}{
+				{
+					"handler": "headers",
+					"response": map[string]interface{}{
+						"set": headerSet,
+					},
+				},
+			},
+		}
+		securityRoutes = append(securityRoutes, headersRoute)
+	}
+
+	// Combine: security routes first, then existing clean routes
+	allRoutes := append(securityRoutes, cleanRoutes...)
+
+	// Push the rebuilt subroute back to Caddy
+	routeBody, err := json.Marshal(allRoutes)
+	if err != nil {
+		return fmt.Errorf("failed to marshal routes: %w", err)
+	}
+
+	patchURL := fmt.Sprintf("%s/config/apps/http/servers/srv0/routes/%d/handle/0/routes", s.apiURL, routeIndex)
+	req, err := http.NewRequest("PATCH", patchURL, bytes.NewReader(routeBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	patchResp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to patch caddy route: %w", err)
+	}
+	defer patchResp.Body.Close()
+
+	if patchResp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(patchResp.Body)
+		return fmt.Errorf("caddy rejected security config (HTTP %d): %s", patchResp.StatusCode, string(respBody))
+	}
+
 	return nil
 }

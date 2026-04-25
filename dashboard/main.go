@@ -32,12 +32,19 @@ func main() {
 		logger.Warn("docker", "Docker service unavailable: "+err.Error())
 	}
 
+	// Initialize security service
+	securitySvc := services.NewSecurityService("/data/security.json", caddySvc)
+
+	// Re-apply saved security configs to Caddy on startup (async so boot isn't blocked)
+	go securitySvc.ApplyAllToCaddy()
+
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, auth)
 	domainsHandler := handlers.NewDomainsHandler(caddySvc, dockerSvc)
 	systemHandler := handlers.NewSystemHandler(sysInfoSvc, cfg)
 	dashboardHandler := handlers.NewDashboardHandler("/static")
 	appsHandler := handlers.NewAppsHandler()
+	securityHandler := handlers.NewSecurityHandler(securitySvc, caddySvc)
 	var containersHandler *handlers.ContainersHandler
 	if dockerSvc != nil {
 		containersHandler = handlers.NewContainersHandler(dockerSvc)
@@ -62,6 +69,22 @@ func main() {
 	protectedMux.HandleFunc("/api/system/update", systemHandler.UpdateSystem)
 	protectedMux.HandleFunc("/api/system/logs", systemHandler.Logs)
 	protectedMux.HandleFunc("/api/system/reboot-stack", systemHandler.RebootStack)
+
+	// Security
+	protectedMux.HandleFunc("/api/security/domains", securityHandler.ListDomainSecurity)
+	protectedMux.HandleFunc("/api/security/domain", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			securityHandler.GetDomainSecurity(w, r)
+		case http.MethodPut:
+			securityHandler.UpdateDomainSecurity(w, r)
+		default:
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		}
+	})
+	protectedMux.HandleFunc("/api/security/ips", securityHandler.ListBlockedIPs)
+	protectedMux.HandleFunc("/api/security/ips/block", securityHandler.BlockIP)
+	protectedMux.HandleFunc("/api/security/ips/unblock", securityHandler.UnblockIP)
 
 	// Settings
 	protectedMux.HandleFunc("/api/settings/email", func(w http.ResponseWriter, r *http.Request) {

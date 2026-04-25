@@ -751,6 +751,47 @@ table{border-collapse:collapse;width:100%}
     background: rgba(100,116,139,0.15);
     color: var(--text-secondary);
 }
+.badge-red {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--red-light);
+}
+
+/* ── Security IP Entries ── */
+.ip-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+}
+.ip-entry code {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--blue-light);
+}
+.ip-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.ip-reason {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.ip-date {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ── Security Preset Buttons ── */
+.preset-btn.active {
+    background: var(--bg-active);
+    color: var(--text-primary);
+    font-weight: 600;
+}
 
 .ssl-active {
     color: var(--green-light);

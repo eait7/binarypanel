@@ -11,6 +11,10 @@ const DomainsModule = {
             if (!data) return;
 
             this.domains = data.domains || [];
+
+            // Also load security statuses
+            await SecurityModule.loadStatuses();
+
             this.renderDomains();
             this.updateDashboardStat();
         } catch (err) {
@@ -32,7 +36,16 @@ const DomainsModule = {
         empty.style.display = 'none';
         tableWrap.style.display = 'block';
 
-        tbody.innerHTML = this.domains.map((d, i) => `
+        tbody.innerHTML = this.domains.map((d, i) => {
+            const domainName = d.domains ? d.domains[0] : '';
+            const secStatus = SecurityModule.getStatus(domainName);
+            const score = secStatus.security_score || 0;
+            let scoreBadgeClass = 'badge-red';
+            let scoreIcon = '🔴';
+            if (score >= 80) { scoreBadgeClass = 'badge-green'; scoreIcon = '🟢'; }
+            else if (score >= 40) { scoreBadgeClass = 'badge-amber'; scoreIcon = '🟡'; }
+
+            return `
             <tr>
                 <td>
                     <span class="domain-name">${BinaryPanel.escapeHtml(d.domains ? d.domains.join(', ') : '—')}</span>
@@ -51,28 +64,36 @@ const DomainsModule = {
                     </span>
                 </td>
                 <td>
+                    <span class="badge ${scoreBadgeClass}" title="Security Score: ${score}/100">
+                        ${scoreIcon} ${score}/100
+                    </span>
+                </td>
+                <td>
                     <div class="table-actions">
+                        <button class="btn-icon" style="color: var(--purple)" title="Security Settings" onclick="SecurityModule.openConfig('${BinaryPanel.escapeHtml(domainName)}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        </button>
                         ${d.type === 'reverse_proxy' && d.upstream ? `
-                        <button class="btn-icon" style="color: var(--blue)" title="Restart Server" onclick="DomainsModule.triggerRestart(${i}, '${BinaryPanel.escapeHtml(d.domains ? d.domains[0] : '')}')">
+                        <button class="btn-icon" style="color: var(--blue)" title="Restart Server" onclick="DomainsModule.triggerRestart(${i}, '${BinaryPanel.escapeHtml(domainName)}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                         </button>
-                        <button class="btn-icon" style="color: var(--blue)" title="Download Backup" onclick="DomainsModule.triggerBackup(${i}, '${BinaryPanel.escapeHtml(d.domains ? d.domains[0] : '')}')">
+                        <button class="btn-icon" style="color: var(--blue)" title="Download Backup" onclick="DomainsModule.triggerBackup(${i}, '${BinaryPanel.escapeHtml(domainName)}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         </button>
-                        <button class="btn-icon" style="color: var(--blue)" title="Restore Backup" onclick="DomainsModule.triggerRestore(${i}, '${BinaryPanel.escapeHtml(d.domains ? d.domains[0] : '')}')">
+                        <button class="btn-icon" style="color: var(--blue)" title="Restore Backup" onclick="DomainsModule.triggerRestore(${i}, '${BinaryPanel.escapeHtml(domainName)}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         </button>
                         ` : ''}
                         <button class="btn-icon" title="Edit" onclick="DomainsModule.editDomain(${i})">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
-                        <button class="btn-icon" title="Delete" onclick="DomainsModule.deleteDomain(${i}, '${BinaryPanel.escapeHtml(d.domains ? d.domains[0] : '')}')">
+                        <button class="btn-icon" title="Delete" onclick="DomainsModule.deleteDomain(${i}, '${BinaryPanel.escapeHtml(domainName)}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                     </div>
                 </td>
             </tr>
-        `).join('');
+        `}).join('');
     },
 
     updateDashboardStat() {
