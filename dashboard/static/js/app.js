@@ -168,6 +168,121 @@ const BinaryPanel = {
                 }
             });
         }
+
+        // ── System Stack Reboot ──
+        const rebootBtn = document.getElementById('system-reboot-btn');
+        if (rebootBtn) {
+            rebootBtn.addEventListener('click', async () => {
+                const status = document.getElementById('system-reboot-status');
+                const loader = rebootBtn.querySelector('.btn-loader');
+
+                if (!await this.confirm("Reboot All Services", "This will restart all BinaryPanel containers (Caddy, Dashboard, FileBrowser). The dashboard will temporarily disconnect. Continue?")) return;
+
+                rebootBtn.disabled = true;
+                loader.style.display = 'inline-block';
+                status.textContent = "Rebooting all services...";
+                status.style.color = "#3b82f6";
+
+                try {
+                    await this.api('/api/system/reboot-stack', { method: 'POST' });
+                    status.textContent = "Services restarting... auto-reconnecting in ~15 seconds.";
+
+                    // Auto-reconnect polling
+                    const pollInterval = setInterval(async () => {
+                        try {
+                            const ping = await fetch('/api/system/stats');
+                            if (ping.ok) {
+                                clearInterval(pollInterval);
+                                status.textContent = "✅ All services back online!";
+                                status.style.color = "#10b981";
+                                rebootBtn.disabled = false;
+                                loader.style.display = 'none';
+                                // Reload data
+                                this.loadSectionData(this.currentSection);
+                            }
+                        } catch(e) {}
+                    }, 3000);
+
+                } catch(err) {
+                    status.textContent = "❌ " + err.message;
+                    status.style.color = "#ef4444";
+                    rebootBtn.disabled = false;
+                    loader.style.display = 'none';
+                }
+            });
+        }
+
+        // ── System Error Log Viewer ──
+        const logsBtn = document.getElementById('system-logs-btn');
+        if (logsBtn) {
+            logsBtn.addEventListener('click', () => this.openSystemLog());
+        }
+
+        const syslogClose = document.getElementById('syslog-modal-close');
+        if (syslogClose) {
+            syslogClose.addEventListener('click', () => {
+                document.getElementById('syslog-modal').style.display = 'none';
+            });
+        }
+
+        const syslogRefresh = document.getElementById('syslog-refresh');
+        if (syslogRefresh) {
+            syslogRefresh.addEventListener('click', () => this.loadSystemLog());
+        }
+
+        // Log level filter buttons
+        document.querySelectorAll('.syslog-filter').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.syslog-filter').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.loadSystemLog(btn.dataset.level);
+            });
+        });
+    },
+
+    // ── System Log Methods ──
+    async openSystemLog() {
+        document.getElementById('syslog-modal').style.display = 'flex';
+        this.loadSystemLog();
+    },
+
+    async loadSystemLog(level = '') {
+        const content = document.getElementById('syslog-content');
+        content.textContent = 'Loading logs...';
+
+        try {
+            let url = '/api/system/logs?limit=100';
+            if (level) url += '&level=' + level;
+            const data = await this.api(url);
+
+            if (!data || !data.entries || data.entries.length === 0) {
+                content.innerHTML = '<span style="color: #64748b;">No log entries found. The system is running cleanly.</span>';
+                return;
+            }
+
+            const levelColors = {
+                'ERROR': '#ef4444',
+                'WARN': '#f59e0b',
+                'INFO': '#3b82f6'
+            };
+
+            let html = '';
+            for (const entry of data.entries) {
+                const color = levelColors[entry.level] || '#94a3b8';
+                const ts = entry.timestamp.replace('T', ' ').replace('Z', ' UTC');
+                html += `<span style="color: #64748b;">${this.escapeHtml(ts)}</span> `;
+                html += `<span style="color: ${color}; font-weight: 600;">[${entry.level}]</span> `;
+                html += `<span style="color: #8b5cf6;">[${this.escapeHtml(entry.component)}]</span> `;
+                html += this.escapeHtml(entry.message);
+                if (entry.context) {
+                    html += `\n  <span style="color: #fbbf24;">↳ ${this.escapeHtml(entry.context)}</span>`;
+                }
+                html += '\n';
+            }
+            content.innerHTML = html;
+        } catch (err) {
+            content.textContent = 'Failed to load logs: ' + err.message;
+        }
     },
 
     // ── Auth ──

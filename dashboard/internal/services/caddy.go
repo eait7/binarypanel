@@ -42,6 +42,10 @@ func NewCaddyService(apiURL string) *CaddyService {
 func (s *CaddyService) GetConfig() (map[string]interface{}, error) {
 	resp, err := s.client.Get(s.apiURL + "/config/")
 	if err != nil {
+		if logger := GetLogger(); logger != nil {
+			diag := DiagnoseCaddyError(err)
+			logger.Error("caddy", "Failed to fetch Caddy config: "+err.Error(), diag)
+		}
 		return nil, fmt.Errorf("caddy api unreachable: %w", err)
 	}
 	defer resp.Body.Close()
@@ -57,6 +61,10 @@ func (s *CaddyService) GetConfig() (map[string]interface{}, error) {
 func (s *CaddyService) ListDomains() ([]DomainInfo, error) {
 	resp, err := s.client.Get(s.apiURL + "/config/apps/http/servers")
 	if err != nil {
+		if logger := GetLogger(); logger != nil {
+			diag := DiagnoseCaddyError(err)
+			logger.Error("caddy", "Failed to list domains: "+err.Error(), diag)
+		}
 		return nil, fmt.Errorf("caddy api unreachable: %w", err)
 	}
 	defer resp.Body.Close()
@@ -214,12 +222,19 @@ func (s *CaddyService) AddSite(domain, upstream, handlerType string) error {
 		bytes.NewReader(body),
 	)
 	if err != nil {
+		if logger := GetLogger(); logger != nil {
+			diag := DiagnoseCaddyError(err)
+			logger.Error("caddy", fmt.Sprintf("Failed to add site '%s' -> '%s': %v", domain, upstream, err), diag)
+		}
 		return fmt.Errorf("failed to add site: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(resp.Body)
+		if logger := GetLogger(); logger != nil {
+			logger.Error("caddy", fmt.Sprintf("Caddy rejected site add for '%s' (HTTP %d): %s", domain, resp.StatusCode, string(respBody)))
+		}
 		return fmt.Errorf("caddy error (%d): %s", resp.StatusCode, string(respBody))
 	}
 
@@ -238,6 +253,10 @@ func (s *CaddyService) RemoveSite(routeIndex int) error {
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
+		if logger := GetLogger(); logger != nil {
+			diag := DiagnoseCaddyError(err)
+			logger.Error("caddy", fmt.Sprintf("Failed to remove site at index %d: %v", routeIndex, err), diag)
+		}
 		return fmt.Errorf("failed to remove site: %w", err)
 	}
 	defer resp.Body.Close()

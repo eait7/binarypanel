@@ -19,12 +19,17 @@ func main() {
 	// Initialize settings
 	config.InitSettings()
 
+	// Initialize structured logger (must be before services that use it)
+	logger := services.NewPanelLogger("/data/binarypanel.log", 200)
+	logger.Info("system", "BinaryPanel dashboard starting up")
+
 	// Initialize services
 	caddySvc := services.NewCaddyService(cfg.CaddyAPI)
 	sysInfoSvc := services.NewSysInfoService()
 	dockerSvc, err := services.NewDockerService()
 	if err != nil {
 		log.Printf("WARNING: Docker service unavailable: %v", err)
+		logger.Warn("docker", "Docker service unavailable: "+err.Error())
 	}
 
 	// Initialize handlers
@@ -55,6 +60,8 @@ func main() {
 	protectedMux.HandleFunc("/api/system/stats", systemHandler.Stats)
 	protectedMux.HandleFunc("/api/links", systemHandler.Links)
 	protectedMux.HandleFunc("/api/system/update", systemHandler.UpdateSystem)
+	protectedMux.HandleFunc("/api/system/logs", systemHandler.Logs)
+	protectedMux.HandleFunc("/api/system/reboot-stack", systemHandler.RebootStack)
 
 	// Settings
 	protectedMux.HandleFunc("/api/settings/email", func(w http.ResponseWriter, r *http.Request) {

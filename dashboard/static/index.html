@@ -512,6 +512,25 @@
                     </button>
                     <p id="system-update-status" style="margin-top:0.5rem; font-size:0.875rem;"></p>
                 </div>
+
+                <!-- System Reboot -->
+                <div class="card" style="flex:1; min-width:300px;">
+                    <h3 class="card-title">System Service Manager</h3>
+                    <p class="form-hint" style="margin-bottom: 20px;">Restart all BinaryPanel containers to resolve networking issues, DNS failures, or stale connections.</p>
+                    <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                         <p style="font-size: 0.875rem; color: #fcd34d; margin:0;"><strong>Note:</strong> This will restart all services (Caddy, Dashboard, FileBrowser). The dashboard will temporarily disconnect and auto-reconnect in ~15 seconds.</p>
+                    </div>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-danger" id="system-reboot-btn">
+                            <span class="btn-text">⚡ Reboot All Services</span>
+                            <span class="btn-loader" style="display:none"></span>
+                        </button>
+                        <button type="button" class="btn btn-outline" id="system-logs-btn">
+                            📋 View Error Log
+                        </button>
+                    </div>
+                    <p id="system-reboot-status" style="margin-top:0.5rem; font-size:0.875rem;"></p>
+                </div>
             </div>
         </section>
 
@@ -598,6 +617,26 @@
     </div>
 </div>
 
+<!-- System Error Log Modal -->
+<div id="syslog-modal" class="modal-overlay" style="display:none">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h3>System Error Log</h3>
+            <button class="modal-close" id="syslog-modal-close">&times;</button>
+        </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px; padding: 0 1.5rem;">
+            <button class="btn btn-sm btn-outline syslog-filter active" data-level="">All</button>
+            <button class="btn btn-sm btn-outline syslog-filter" data-level="ERROR">Errors</button>
+            <button class="btn btn-sm btn-outline syslog-filter" data-level="WARN">Warnings</button>
+            <button class="btn btn-sm btn-outline syslog-filter" data-level="INFO">Info</button>
+            <button class="btn btn-sm btn-ghost" id="syslog-refresh" style="margin-left: auto;">↻ Refresh</button>
+        </div>
+        <div class="log-viewer" id="syslog-viewer" style="max-height: 500px; overflow-y: auto;">
+            <pre id="syslog-content" style="font-size: 0.8rem; line-height: 1.6;">Loading logs...</pre>
+        </div>
+    </div>
+</div>
+
 <!-- Confirm Modal -->
 <div id="confirm-modal" class="modal-overlay" style="display:none">
     <div class="modal modal-sm">
@@ -618,11 +657,11 @@
 
 <!-- Toast Container -->
 <div id="toast-container" class="toast-container"></div>
-<script src="/js/app.js?v=1.5"></script>
-<script src="/js/domains.js?v=1.5"></script>
-<script src="/js/containers.js?v=1.5"></script>
-<script src="/js/system.js?v=1.5"></script>
-<script src="/js/providers.js?v=1.5"></script>
-<script src="/js/settings.js?v=1.5"></script>
+<script src="/js/app.js?v=1.6"></script>
+<script src="/js/domains.js?v=1.6"></script>
+<script src="/js/containers.js?v=1.6"></script>
+<script src="/js/system.js?v=1.6"></script>
+<script src="/js/providers.js?v=1.6"></script>
+<script src="/js/settings.js?v=1.6"></script>
 </body>
 </html>

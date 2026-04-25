@@ -15,6 +15,11 @@ import (
 	"binarypanel/internal/services"
 )
 
+// getLogger is a helper to access the global panel logger.
+func getLogger() *services.PanelLogger {
+	return services.GetLogger()
+}
+
 // DomainsHandler manages domain/site CRUD via Caddy's API.
 type DomainsHandler struct {
 	caddy  *services.CaddyService
@@ -30,6 +35,10 @@ func NewDomainsHandler(caddy *services.CaddyService, docker *services.DockerServ
 func (h *DomainsHandler) List(w http.ResponseWriter, r *http.Request) {
 	domains, err := h.caddy.ListDomains()
 	if err != nil {
+		if logger := getLogger(); logger != nil {
+			diag := services.DiagnoseCaddyError(err)
+			logger.Error("domains", "Failed to list domains: "+err.Error(), diag)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"domains": []interface{}{},
@@ -67,8 +76,17 @@ func (h *DomainsHandler) Add(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.caddy.AddSite(req.Domain, req.Upstream, req.Type); err != nil {
+		if logger := getLogger(); logger != nil {
+			diag := services.DiagnoseCaddyError(err)
+			logger.Error("domains", fmt.Sprintf("Failed to add domain '%s' -> '%s': %v", req.Domain, req.Upstream, err), diag)
+		}
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		errMsg := err.Error()
+		diag := services.DiagnoseCaddyError(err)
+		if diag != "" {
+			errMsg += " | Hint: " + diag
+		}
+		json.NewEncoder(w).Encode(map[string]string{"error": errMsg})
 		return
 	}
 
@@ -95,6 +113,9 @@ func (h *DomainsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.caddy.RemoveSite(id); err != nil {
+		if logger := getLogger(); logger != nil {
+			logger.Error("domains", fmt.Sprintf("Failed to remove domain at index %d: %v", id, err))
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -133,6 +154,9 @@ func (h *DomainsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.caddy.UpdateSite(id, req.Domain, req.Upstream, req.Type); err != nil {
+		if logger := getLogger(); logger != nil {
+			logger.Error("domains", fmt.Sprintf("Failed to update domain at index %d: %v", id, err))
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
