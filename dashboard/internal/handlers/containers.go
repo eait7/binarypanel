@@ -70,6 +70,24 @@ func (h *ContainersHandler) Stop(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
+// Delete handles DELETE /api/containers/{id}
+func (h *ContainersHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := extractContainerID(r.URL.Path)
+	if id == "" {
+		http.Error(w, `{"error":"missing container id"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.docker.RemoveContainer(id); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+}
+
 // Restart handles POST /api/containers/{id}/restart
 func (h *ContainersHandler) Restart(w http.ResponseWriter, r *http.Request) {
 	id := extractContainerID(r.URL.Path)

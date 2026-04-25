@@ -91,8 +91,36 @@ const BinaryPanel = {
                         method: 'POST',
                         body: JSON.stringify({ port })
                     });
-                    status.textContent = "✅ " + res.message;
-                    status.style.color = "#10b981";
+                    
+                    status.textContent = "⏳ Compiling native image and pulling layers... (This will take up to 60 seconds)";
+                    status.style.color = "#3b82f6";
+                    
+                    let isRunning = false;
+                    if (res.container) {
+                        // Poll API to check if container is running
+                        for (let i = 0; i < 40; i++) {
+                            await new Promise(r => setTimeout(r, 3000));
+                            try {
+                                const containersRes = await this.api('/api/containers');
+                                const containers = containersRes.containers || [];
+                                const c = containers.find(x => x.name === res.container);
+                                if (c && c.state === 'running') {
+                                    isRunning = true;
+                                    break;
+                                }
+                            } catch (e) {
+                                // Ignore polling errors
+                            }
+                        }
+                    }
+
+                    if (isRunning) {
+                        status.textContent = "✅ BinaryCMS successfully deployed and fully operational on Port " + port;
+                        status.style.color = "#10b981";
+                    } else {
+                        status.textContent = "⚠️ Deployment initiated, but timed out waiting for 'running' state. Please check the Containers tab.";
+                        status.style.color = "#f59e0b";
+                    }
                 } catch (err) {
                     status.textContent = "❌ " + err.message;
                     status.style.color = "#ef4444";

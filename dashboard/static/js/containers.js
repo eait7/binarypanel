@@ -110,6 +110,10 @@ const ContainersModule = {
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                             Logs
                         </button>
+                        <button class="btn btn-ghost btn-sm text-red" style="color: var(--red);" onclick="ContainersModule.deleteContainer('${c.id}', '${BinaryPanel.escapeHtml(c.name)}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                            Delete
+                        </button>
                     </div>
                 </div>
             `;
@@ -153,6 +157,19 @@ const ContainersModule = {
             await this.loadContainers();
         } catch (err) {
             BinaryPanel.toast(`Failed to restart ${name}: ${err.message}`, 'error');
+        }
+    },
+
+    async deleteContainer(id, name) {
+        const confirmed = await BinaryPanel.confirm('Delete Container', `Are you absolutely sure you want to permanently delete "${name}"? This action cannot be undone and non-persistent data will be lost.`);
+        if (!confirmed) return;
+
+        try {
+            await BinaryPanel.apiRequest(`/api/containers/${id}`, { method: 'DELETE' });
+            BinaryPanel.toast(`${name} deleted permanently`, 'success');
+            await this.loadContainers();
+        } catch (err) {
+            BinaryPanel.toast(`Failed to delete ${name}: ${err.message}`, 'error');
         }
     },
 

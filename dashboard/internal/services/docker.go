@@ -150,7 +150,27 @@ func (s *DockerService) StopContainer(id string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode >= 400 && resp.StatusCode != 304 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("docker error (%d): %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+// RemoveContainer permanently deletes a container.
+func (s *DockerService) RemoveContainer(id string) error {
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("http://docker/containers/%s?force=true&v=true", id), nil)
+	if err != nil {
+		return err
+	}
+	
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to remove container: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 && resp.StatusCode != 404 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("docker error (%d): %s", resp.StatusCode, string(body))
 	}

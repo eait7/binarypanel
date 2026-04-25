@@ -149,6 +149,8 @@ func main() {
 				containersHandler.Restart(w, r)
 			case strings.HasSuffix(path, "/logs") && r.Method == http.MethodGet:
 				containersHandler.Logs(w, r)
+			case r.Method == http.MethodDelete:
+				containersHandler.Delete(w, r)
 			default:
 				http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 			}
