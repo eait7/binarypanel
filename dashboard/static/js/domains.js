@@ -135,7 +135,8 @@ const DomainsModule = {
         const editField = document.getElementById('domain-edit-id');
 
         if (editId !== null) {
-            const domain = this.domains.find(d => d.id === editId);
+            // Use the array index directly, or fallback to loose equality if an id property exists
+            const domain = this.domains[editId] || this.domains.find(d => d.id == editId);
             if (domain) {
                 title.textContent = 'Edit Domain';
                 saveBtn.textContent = 'Save Changes';
