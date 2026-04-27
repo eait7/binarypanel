@@ -99,6 +99,10 @@ const BinaryPanel = {
                     if (res.container) {
                         // Poll API to check if container is running
                         for (let i = 0; i < 40; i++) {
+                            // Estimate progress based on typical 60s compile time
+                            let percent = Math.min(99, Math.round(((i + 1) / 20) * 100));
+                            status.textContent = `⏳ Compiling native image and pulling layers... ${percent}%`;
+                            
                             await new Promise(r => setTimeout(r, 3000));
                             try {
                                 const containersRes = await this.api('/api/containers');

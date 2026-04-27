@@ -49,6 +49,9 @@ func (h *AppsHandler) DeployBinaryCMS(w http.ResponseWriter, r *http.Request) {
 			"-p", fmt.Sprintf("%s:8080", req.Port),
 			"-v", fmt.Sprintf("%s_uploads:/app/uploads", containerName),
 			"-v", fmt.Sprintf("%s_db:/app/data", containerName),
+			"-v", fmt.Sprintf("%s_themes:/app/themes", containerName),
+			"-v", fmt.Sprintf("%s_plugins:/app/plugins", containerName),
+			"-v", fmt.Sprintf("%s_plugins_data:/app/plugins_data", containerName),
 			"--restart", "unless-stopped",
 			"eait7/binarycms:latest")
 		
