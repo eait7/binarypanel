@@ -135,6 +135,67 @@ const BinaryPanel = {
                 }
             });
         }
+
+        // SearXNG 1-Click Deployment
+        const searxngForm = document.getElementById('searxng-deploy-form');
+        if (searxngForm) {
+            searxngForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const port = document.getElementById('searxng-deploy-port').value;
+                const btn = document.getElementById('searxng-deploy-btn');
+                const status = document.getElementById('searxng-deploy-status');
+                
+                btn.disabled = true;
+                btn.querySelector('.btn-text').textContent = 'Deploying SearXNG...';
+                btn.querySelector('.btn-loader').style.display = 'inline-block';
+                status.textContent = "Pulling SearXNG image... Please wait.";
+                status.style.color = "#3b82f6";
+                
+                try {
+                    const res = await this.api('/api/apps/deploy/searxng', {
+                        method: 'POST',
+                        body: JSON.stringify({ port })
+                    });
+                    
+                    status.textContent = "⏳ Pulling image and starting container...";
+                    
+                    let isRunning = false;
+                    if (res.container) {
+                        for (let i = 0; i < 40; i++) {
+                            let percent = Math.min(99, Math.round(((i + 1) / 40) * 100));
+                            status.textContent = `⏳ Pulling image and starting container... ${percent}%`;
+                            
+                            await new Promise(r => setTimeout(r, 3000));
+                            try {
+                                const containersRes = await this.api('/api/containers');
+                                const containers = containersRes.containers || [];
+                                const c = containers.find(x => x.name === res.container);
+                                if (c && c.state === 'running') {
+                                    isRunning = true;
+                                    break;
+                                }
+                            } catch (e) {}
+                        }
+                    }
+
+                    if (isRunning) {
+                        status.textContent = "✅ SearXNG successfully deployed on Port " + port;
+                        status.style.color = "#10b981";
+                    } else {
+                        status.textContent = "⚠️ Deployment initiated, but timed out. Check the Containers tab.";
+                        status.style.color = "#f59e0b";
+                    }
+                } catch (err) {
+                    status.textContent = "❌ " + err.message;
+                    status.style.color = "#ef4444";
+                } finally {
+                    btn.disabled = false;
+                    btn.querySelector('.btn-text').textContent = '🔍 1-Click Deploy';
+                    btn.querySelector('.btn-loader').style.display = 'none';
+                }
+            });
+        }
+
         // UI Login Credentials Override
         const authForm = document.getElementById('auth-settings-form');
         if (authForm) {

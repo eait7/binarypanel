@@ -65,3 +65,49 @@ func (h *AppsHandler) DeployBinaryCMS(w http.ResponseWriter, r *http.Request) {
 		"container": containerName,
 	})
 }
+
+// DeploySearXNG handles POST /api/apps/deploy/searxng
+func (h *AppsHandler) DeploySearXNG(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Port string `json:"port"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.Port == "" {
+		http.Error(w, `{"error":"port is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	containerName := fmt.Sprintf("searxng_%d", time.Now().Unix())
+
+	go func() {
+		// Pull the official SearXNG image
+		pullCmd := exec.Command("docker", "pull", "searxng/searxng:latest")
+		if err := pullCmd.Run(); err != nil {
+			return
+		}
+
+		// Run the container with persistent config volume
+		runCmd := exec.Command("docker", "run", "-d",
+			"--name", containerName,
+			"--network", "binarypanel_binarypanel",
+			"-p", fmt.Sprintf("%s:8080", req.Port),
+			"-v", fmt.Sprintf("%s_config:/etc/searxng", containerName),
+			"-e", "SEARXNG_BASE_URL=http://localhost:"+req.Port+"/",
+			"--restart", "unless-stopped",
+			"searxng/searxng:latest")
+
+		runCmd.Run()
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"message":   "SearXNG deployment initiated! Pulling image and starting container on Port " + req.Port + ". Ready in ~30 seconds.",
+		"container": containerName,
+	})
+}

@@ -62,6 +62,7 @@ func main() {
 	
 	// Apps (1-Click Installer)
 	protectedMux.HandleFunc("/api/apps/deploy/binarycms", appsHandler.DeployBinaryCMS)
+	protectedMux.HandleFunc("/api/apps/deploy/searxng", appsHandler.DeploySearXNG)
 
 	// System
 	protectedMux.HandleFunc("/api/system/stats", systemHandler.Stats)

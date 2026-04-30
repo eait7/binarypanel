@@ -576,6 +576,23 @@
             </form>
             <p id="app-deploy-status" style="margin-top: 1rem; font-size: 0.875rem; font-weight: 500;"></p>
         </div>
+
+        <div class="card" style="max-width: 600px; margin-top: 1.5rem;">
+            <h3 class="card-title">🔍 SearXNG</h3>
+            <p style="color: #94a3b8; font-size: 0.875rem; margin-bottom: 1.5rem; line-height: 1.5;">A privacy-respecting, open-source metasearch engine. Aggregates results from 70+ search services without tracking. Self-hosted, ad-free, and fully configurable.</p>
+            
+            <form id="searxng-deploy-form" style="display: flex; gap: 1rem; align-items: flex-end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Internal Target Port</label>
+                    <input type="number" id="searxng-deploy-port" placeholder="8888" required style="width: 150px;">
+                </div>
+                <button type="submit" id="searxng-deploy-btn" class="btn btn-primary" style="margin-bottom: 0px;">
+                    <span class="btn-text">🔍 1-Click Deploy</span>
+                    <span class="btn-loader" style="display:none"></span>
+                </button>
+            </form>
+            <p id="searxng-deploy-status" style="margin-top: 1rem; font-size: 0.875rem; font-weight: 500;"></p>
+        </div>
     </section>
 
     </main>
