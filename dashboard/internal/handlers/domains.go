@@ -24,11 +24,12 @@ func getLogger() *services.PanelLogger {
 type DomainsHandler struct {
 	caddy  *services.CaddyService
 	docker *services.DockerService
+	store  *services.DomainStore
 }
 
 // NewDomainsHandler creates a new domains handler.
-func NewDomainsHandler(caddy *services.CaddyService, docker *services.DockerService) *DomainsHandler {
-	return &DomainsHandler{caddy: caddy, docker: docker}
+func NewDomainsHandler(caddy *services.CaddyService, docker *services.DockerService, store *services.DomainStore) *DomainsHandler {
+	return &DomainsHandler{caddy: caddy, docker: docker, store: store}
 }
 
 // List handles GET /api/domains
@@ -90,6 +91,9 @@ func (h *DomainsHandler) Add(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Persist so the domain survives Caddy restarts.
+	_ = h.store.Add(req.Domain, req.Upstream, req.Type)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
@@ -119,6 +123,11 @@ func (h *DomainsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
+	}
+
+	// Remove from persistent store by resolving the domain name at that index.
+	if domains, err := h.caddy.ListDomains(); err == nil && id < len(domains) && len(domains[id].Domains) > 0 {
+		_ = h.store.Remove(domains[id].Domains[0])
 	}
 
 	w.Header().Set("Content-Type", "application/json")

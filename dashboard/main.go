@@ -35,15 +35,37 @@ func main() {
 		logger.Warn("docker", "Docker service unavailable: "+err.Error())
 	}
 
+	// Domain persistence store — saves domain configs to /data/domains.json
+	// so they survive Caddy restarts without needing --resume.
+	domainStore := services.NewDomainStore("/data")
+
 	// Initialize security service
 	securitySvc := services.NewSecurityService("/data/security.json", caddySvc)
 
-	// Re-apply saved security configs to Caddy on startup (async so boot isn't blocked)
-	go securitySvc.ApplyAllToCaddy()
+	// On startup: re-register persisted domains and security configs in Caddy.
+	// Done async (with delay) so Caddy has time to fully initialize first.
+	go func() {
+		time.Sleep(4 * time.Second)
+
+		// Restore user-configured domains from /data/domains.json
+		if saved, err := domainStore.Load(); err == nil && len(saved) > 0 {
+			logger.Info("domains", fmt.Sprintf("Restoring %d domain(s) to Caddy...", len(saved)))
+			for _, d := range saved {
+				if err := caddySvc.AddSite(d.Domain, d.Upstream, d.Type); err != nil {
+					logger.Warn("domains", fmt.Sprintf("Could not restore %s: %v", d.Domain, err))
+				} else {
+					logger.Info("domains", "Restored: "+d.Domain+" → "+d.Upstream)
+				}
+			}
+		}
+
+		// Re-apply security configs
+		securitySvc.ApplyAllToCaddy()
+	}()
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, auth)
-	domainsHandler := handlers.NewDomainsHandler(caddySvc, dockerSvc)
+	domainsHandler := handlers.NewDomainsHandler(caddySvc, dockerSvc, domainStore)
 	systemHandler := handlers.NewSystemHandler(sysInfoSvc, cfg)
 	dashboardHandler := handlers.NewDashboardHandler("/static")
 	appsHandler := handlers.NewAppsHandler()

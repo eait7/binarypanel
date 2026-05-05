@@ -4,7 +4,7 @@ services:
     image: caddy:latest
     container_name: binarypanel-caddy
     restart: unless-stopped
-    command: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile --resume
+    command: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     ports:
       - "80:80"
       - "443:443"
