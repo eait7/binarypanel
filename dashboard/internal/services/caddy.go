@@ -272,8 +272,8 @@ func (s *CaddyService) prependRoute(serverName string, route map[string]interfac
 		return err
 	}
 
-	// PUT full routes array back
-	req, err := http.NewRequest("PUT",
+	// PATCH full routes array back
+	req, err := http.NewRequest("PATCH",
 		fmt.Sprintf("%s/config/apps/http/servers/%s/routes", s.apiURL, serverName),
 		bytes.NewReader(body),
 	)
