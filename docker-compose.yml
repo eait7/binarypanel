@@ -8,13 +8,13 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # Admin API on localhost only — reachable by dashboard via 172.17.0.1:2019
+      - "127.0.0.1:2019:2019"
     volumes:
       - ./caddy_config:/etc/caddy
       - ./caddy_data:/data
     environment:
-      # Caddy admin API bound to container-internal address only.
-      # The dashboard reaches it via the Docker network name 'caddy:2019'.
-      - CADDY_ADMIN=localhost:2019
+      - CADDY_ADMIN=0.0.0.0:2019
     networks:
       - binarypanel
 
@@ -55,7 +55,8 @@ services:
     ports:
       - "9000:9000"
     environment:
-      - CADDY_API=http://caddy:2019
+      # Use bridge IP instead of Docker hostname to avoid systemd-resolved DNS conflicts
+      - CADDY_API=http://172.17.0.1:2019
       - PORTAINER_URL=https://portainer:9443
       - FILEBROWSER_URL=http://localhost:8090
       - PORTAINER_EXTERNAL_URL=https://localhost:9443
@@ -64,6 +65,9 @@ services:
       - BINARYPANEL_USERNAME=${BINARYPANEL_USERNAME:-admin}
       - BINARYPANEL_PASSWORD=${BINARYPANEL_PASSWORD:-admin}
       - BINARYPANEL_HTTPS=${BINARYPANEL_HTTPS:-false}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./dashboard_data:/data
