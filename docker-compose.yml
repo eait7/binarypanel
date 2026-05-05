@@ -8,15 +8,15 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      # Admin API on localhost only — reachable by dashboard via 172.17.0.1:2019
-      - "127.0.0.1:2019:2019"
     volumes:
       - ./caddy_config:/etc/caddy
       - ./caddy_data:/data
     environment:
+      # Admin API listens on all interfaces so dashboard can reach it via static IP
       - CADDY_ADMIN=0.0.0.0:2019
     networks:
-      - binarypanel
+      binarypanel:
+        ipv4_address: 172.28.0.10
 
   # ── Storage Manager (File Browser UI) ──
   filebrowser:
@@ -55,8 +55,8 @@ services:
     ports:
       - "9000:9000"
     environment:
-      # Use bridge IP instead of Docker hostname to avoid systemd-resolved DNS conflicts
-      - CADDY_API=http://172.17.0.1:2019
+      # Static IP of the caddy container — no DNS required, always reachable
+      - CADDY_API=http://172.28.0.10:2019
       - PORTAINER_URL=https://portainer:9443
       - FILEBROWSER_URL=http://localhost:8090
       - PORTAINER_EXTERNAL_URL=https://localhost:9443
@@ -82,3 +82,7 @@ services:
 networks:
   binarypanel:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16

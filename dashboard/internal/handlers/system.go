@@ -133,9 +133,9 @@ func (h *SystemHandler) RebootStack(w http.ResponseWriter, r *http.Request) {
 		h.logger.Warn("system", "Full stack reboot triggered by admin")
 	}
 
-	// Detached restart of the entire binarypanel compose stack.
-	// Uses nohup + background to ensure the command survives the dashboard container restarting.
-	cmd := exec.Command("sh", "-c", "cd /app/host_binarypanel && docker compose restart &")
+	// Full recreate of the entire binarypanel compose stack.
+	// Uses force-recreate so all config changes (IPs, ports, env vars) are applied.
+	cmd := exec.Command("sh", "-c", "cd /app/host_binarypanel && docker compose up -d --force-recreate &")
 	if err := cmd.Start(); err != nil {
 		if h.logger != nil {
 			h.logger.Error("system", "Stack reboot failed", err.Error())
