@@ -26,6 +26,10 @@ func NewSystemHandler(sysinfo *services.SysInfoService, cfg *config.Config) *Sys
 
 // Stats handles GET /api/system/stats
 func (h *SystemHandler) Stats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
 	stats := h.sysinfo.GetStats()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
@@ -33,6 +37,10 @@ func (h *SystemHandler) Stats(w http.ResponseWriter, r *http.Request) {
 
 // Links handles GET /api/links
 func (h *SystemHandler) Links(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"filebrowser": h.cfg.FileBrowserURL,
