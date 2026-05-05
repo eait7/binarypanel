@@ -2,6 +2,21 @@
 	admin 0.0.0.0:2019
 }
 
+# ── BinaryPanel Admin (HTTPS, zero-config) ───────────────────────────────
+# Serves the BinaryPanel dashboard on port 8443 with Caddy's built-in TLS.
+# Works on every fresh install with NO configuration — access at:
+#   https://YOUR-SERVER-IP:8443
+#
+# When you set PANEL_DOMAIN in .env, BinaryPanel auto-registers itself
+# in Caddy with a real Let's Encrypt certificate instead.
+#
+:8443 {
+	tls internal
+	reverse_proxy localhost:9000
+}
+
+# ── HTTP default ─────────────────────────────────────────────────────────
+# Redirect HTTP → HTTPS panel and show helpful message
 :80 {
-	respond "BinaryPanel is running. Configure your domains at :9000"
+	respond "BinaryPanel is running. Access your panel securely at https://{host}:8443"
 }

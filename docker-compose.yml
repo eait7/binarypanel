@@ -8,6 +8,10 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # BinaryPanel admin HTTPS — served by Caddy with its built-in local CA
+      # Access at https://YOUR-SERVER-IP:8443 (accept the self-signed cert warning)
+      # No configuration needed — secure out of the box on every install
+      - "8443:8443"
     volumes:
       - ./caddy_config:/etc/caddy
       - ./caddy_data:/data

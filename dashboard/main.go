@@ -183,7 +183,8 @@ func main() {
 	log.Printf("   Portainer: %s", cfg.PortainerExternalURL)
 
 	// Auto-register the panel domain in Caddy with HTTPS if PANEL_DOMAIN is set.
-	// This ensures BinaryPanel is only accessible over HTTPS — never plain HTTP.
+	// Without PANEL_DOMAIN: panel is at https://ip:8443 via Caddy's internal TLS.
+	// With PANEL_DOMAIN: panel upgrades to a real Let's Encrypt cert on port 443.
 	if panelDomain := os.Getenv("PANEL_DOMAIN"); panelDomain != "" {
 		caddySvc := services.NewCaddyService(cfg.CaddyAPI)
 		go func() {
@@ -191,13 +192,14 @@ func main() {
 			time.Sleep(3 * time.Second)
 			if err := caddySvc.EnsurePanelRoute(panelDomain, fmt.Sprintf("localhost:%s", cfg.Port)); err != nil {
 				log.Printf("⚠️  Could not register panel domain %s in Caddy: %v", panelDomain, err)
-				log.Printf("   You can still access BinaryPanel via SSH tunnel on port %s", cfg.Port)
+				log.Printf("   Falling back to default: https://SERVER-IP:8443")
 			} else {
-				log.Printf("✅ BinaryPanel accessible at https://%s", panelDomain)
+				log.Printf("✅ BinaryPanel accessible at https://%s (Let's Encrypt SSL)", panelDomain)
 			}
 		}()
 	} else {
-		log.Printf("ℹ️  Tip: Set PANEL_DOMAIN=panel.yourdomain.com to enable HTTPS for BinaryPanel")
+		log.Printf("ℹ️  Panel URL: https://SERVER-IP:8443 (secure, internal TLS — accept browser warning)")
+		log.Printf("   Tip: Set PANEL_DOMAIN=panel.yourdomain.com in .env for a proper SSL certificate")
 	}
 
 	log.Fatal(http.ListenAndServe(addr, handler))
