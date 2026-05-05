@@ -3,6 +3,7 @@ package middleware
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -21,9 +22,13 @@ func NewAuth(secret string) *Auth {
 }
 
 // GenerateToken creates an HMAC-signed session token.
+// The username is Base64-encoded before signing to prevent delimiter injection
+// attacks via crafted usernames containing the | character.
 func (a *Auth) GenerateToken(username string) string {
 	ts := fmt.Sprintf("%d", time.Now().Unix())
-	payload := username + "|" + ts
+	// Base64-encode username so it cannot contain the | delimiter.
+	encodedUser := base64.RawURLEncoding.EncodeToString([]byte(username))
+	payload := encodedUser + "|" + ts
 	mac := hmac.New(sha256.New, a.secret)
 	mac.Write([]byte(payload))
 	sig := hex.EncodeToString(mac.Sum(nil))
@@ -37,10 +42,10 @@ func (a *Auth) ValidateToken(token string) (string, bool) {
 	if len(parts) != 3 {
 		return "", false
 	}
-	username, tsStr, sig := parts[0], parts[1], parts[2]
+	encodedUser, tsStr, sig := parts[0], parts[1], parts[2]
 
-	// Verify signature
-	payload := username + "|" + tsStr
+	// Verify signature first — constant-time comparison prevents timing attacks.
+	payload := encodedUser + "|" + tsStr
 	mac := hmac.New(sha256.New, a.secret)
 	mac.Write([]byte(payload))
 	expected := hex.EncodeToString(mac.Sum(nil))
@@ -48,14 +53,20 @@ func (a *Auth) ValidateToken(token string) (string, bool) {
 		return "", false
 	}
 
-	// Check expiry (24 hours)
+	// Check expiry (24 hours).
 	var ts int64
 	fmt.Sscanf(tsStr, "%d", &ts)
 	if time.Now().Unix()-ts > 86400 {
 		return "", false
 	}
 
-	return username, true
+	// Decode the username.
+	usernameBytes, err := base64.RawURLEncoding.DecodeString(encodedUser)
+	if err != nil {
+		return "", false
+	}
+
+	return string(usernameBytes), true
 }
 
 // RequireAuth wraps an http.Handler and enforces authentication.

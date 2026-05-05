@@ -532,19 +532,29 @@ func (h *DomainsHandler) Backup(w http.ResponseWriter, r *http.Request) {
 	out4, err4 := exec.Command("docker", "cp", targetContainerID+":/app/themes", tmpDir+"/themes").CombinedOutput()
 	out5, err5 := exec.Command("docker", "cp", targetContainerID+":/app/static", tmpDir+"/static").CombinedOutput()
 
+	// Log docker cp errors server-side only — never embed internal details in user downloads.
+	if logger := getLogger(); logger != nil {
+		for label, result := range map[string]struct{ err error; out []byte }{
+			"data":    {err1, out1},
+			"uploads": {err2, out2},
+			"plugins": {err3, out3},
+			"themes":  {err4, out4},
+			"static":  {err5, out5},
+		} {
+			if result.err != nil {
+				logger.Warn("domains", fmt.Sprintf("backup: docker cp %s: %v — %s", label, result.err, string(result.out)))
+			}
+		}
+	}
+
 	zipPath := tmpDir + "/backup.zip"
 	outFile, err := os.Create(zipPath)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"failed to generate dynamic compression matrix identically: %v"}`, err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf(`{"error":"failed to create backup archive: %v"}`, err), http.StatusInternalServerError)
 		return
 	}
 
-	debugInfo := fmt.Sprintf("Data: %v - %s\nUploads: %v - %s\nPlugins: %v - %s\nThemes: %v - %s\nStatic: %v - %s\nTargetContainer: %s", err1, string(out1), err2, string(out2), err3, string(out3), err4, string(out4), err5, string(out5), targetContainerID)
-
 	zw := zip.NewWriter(outFile)
-
-	fDebug, _ := zw.Create("debug.txt")
-	fDebug.Write([]byte(debugInfo))
 
 	filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || path == zipPath {

@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"binarypanel/internal/config"
 	"binarypanel/internal/services"
@@ -50,14 +52,27 @@ func (h *SystemHandler) UpdateSystem(w http.ResponseWriter, r *http.Request) {
 		h.logger.Info("system", "System update triggered by admin")
 	}
 
-	// Dispatch organic detached background compilation sequence natively bypassing Go's lock.
-	cmd := exec.Command("sh", "-c", "cd /app/host_binarypanel && git config --global --add safe.directory /app/host_binarypanel && git pull origin main && docker compose up -d --build --force-recreate dashboard &")
+	// Capture the current commit hash before pulling for the audit log.
+	preHash, _ := exec.Command("sh", "-c",
+		"cd /app/host_binarypanel && git rev-parse --short HEAD 2>/dev/null").Output()
+
+	// Dispatch detached background compilation sequence.
+	cmd := exec.Command("sh", "-c",
+		"cd /app/host_binarypanel && "+
+			"git config --global --add safe.directory /app/host_binarypanel && "+
+			"git pull origin main && "+
+			"docker compose up -d --build --force-recreate dashboard &")
 	if err := cmd.Start(); err != nil {
 		if h.logger != nil {
 			h.logger.Error("system", "System update failed to start", err.Error())
 		}
 		http.Error(w, `{"error":"orchestrator sequence failed"}`, http.StatusInternalServerError)
 		return
+	}
+
+	if h.logger != nil {
+		h.logger.Info("system", fmt.Sprintf("Update initiated from commit %s — rebuild in progress",
+			strings.TrimSpace(string(preHash))))
 	}
 
 	w.Header().Set("Content-Type", "application/json")

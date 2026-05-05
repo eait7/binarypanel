@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"binarypanel/internal/config"
@@ -15,6 +16,7 @@ import (
 func main() {
 	cfg := config.Load()
 	auth := middleware.NewAuth(cfg.Secret)
+	rateLimiter := middleware.NewLoginRateLimiter()
 
 	// Initialize settings
 	config.InitSettings()
@@ -52,14 +54,14 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// ── Auth endpoints (no auth required) ──
-	mux.HandleFunc("/api/auth/login", authHandler.Login)
+	// ── Auth endpoints (no auth required, but login is rate-limited) ──
+	mux.Handle("/api/auth/login", rateLimiter.Middleware(http.HandlerFunc(authHandler.Login)))
 	mux.HandleFunc("/api/auth/session", authHandler.Session)
 	mux.HandleFunc("/api/auth/logout", authHandler.Logout)
 
 	// ── Protected API endpoints ──
 	protectedMux := http.NewServeMux()
-	
+
 	// Apps (1-Click Installer)
 	protectedMux.HandleFunc("/api/apps/deploy/binarycms", appsHandler.DeployBinaryCMS)
 	protectedMux.HandleFunc("/api/apps/deploy/searxng", appsHandler.DeploySearXNG)
@@ -100,6 +102,7 @@ func main() {
 	})
 	protectedMux.HandleFunc("/api/settings/email/test", handlers.TestEmailSettings)
 	protectedMux.HandleFunc("/api/settings/auth", authHandler.UpdateCredentials)
+
 	// Domains
 	protectedMux.HandleFunc("/api/domains", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -164,8 +167,13 @@ func main() {
 	// ── Static files (SPA) ──
 	mux.Handle("/", dashboardHandler)
 
-	// CORS + logging wrapper
-	handler := loggingMiddleware(mux)
+	// ── Middleware chain (outermost to innermost): SecurityHeaders → CORS → Logging ──
+	panelOrigin := os.Getenv("BINARYPANEL_ORIGIN") // e.g. "https://panel.example.com"
+	handler := middleware.SecurityHeaders(
+		corsMiddleware(panelOrigin,
+			loggingMiddleware(mux),
+		),
+	)
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("🚀 BinaryPanel Dashboard starting on %s", addr)
@@ -175,11 +183,45 @@ func main() {
 	log.Fatal(http.ListenAndServe(addr, handler))
 }
 
+// loggingMiddleware logs API requests only (not static assets).
+// Sensitive paths like /api/auth/login are noted but credentials are never logged.
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			log.Printf("%s %s", r.Method, r.URL.Path)
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// corsMiddleware enforces same-origin CORS policy.
+// If origin is empty the panel allows requests from any origin on the same host
+// (suitable for direct IP access). Set BINARYPANEL_ORIGIN to lock it to a domain.
+func corsMiddleware(allowedOrigin string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			if allowedOrigin != "" {
+				// Strict mode: only allow the configured origin.
+				if origin == allowedOrigin {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Set("Vary", "Origin")
+				}
+			}
+			// No wildcard * — unlisted origins receive no CORS headers (browser blocks them).
+		}
+
+		// Handle pre-flight requests.
+		if r.Method == http.MethodOptions {
+			if allowedOrigin != "" && origin == allowedOrigin {
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+				w.Header().Set("Access-Control-Max-Age", "86400")
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }

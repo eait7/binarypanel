@@ -3,9 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 
 	"golang.org/x/crypto/bcrypt"
-	
+
 	"binarypanel/internal/config"
 	"binarypanel/internal/middleware"
 )
@@ -59,12 +60,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := h.auth.GenerateToken(creds.Username)
+	secureCookie := os.Getenv("BINARYPANEL_HTTPS") == "true"
 	http.SetCookie(w, &http.Cookie{
 		Name:     "binarypanel_session",
 		Value:    token,
 		Path:     "/",
 		MaxAge:   86400,
 		HttpOnly: true,
+		Secure:   secureCookie,
 		SameSite: http.SameSiteStrictMode,
 	})
 
@@ -123,6 +126,12 @@ func (h *AuthHandler) UpdateCredentials(w http.ResponseWriter, r *http.Request) 
 
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Enforce minimum password length server-side (UI hint alone is bypassable via API).
+	if len(creds.Password) < 12 {
+		http.Error(w, `{"error":"password must be at least 12 characters"}`, http.StatusBadRequest)
 		return
 	}
 

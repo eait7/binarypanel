@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os/exec"
+	"strconv"
 	"time"
 )
 
@@ -29,6 +30,13 @@ func (h *AppsHandler) DeployBinaryCMS(w http.ResponseWriter, r *http.Request) {
 
 	if req.Port == "" {
 		http.Error(w, `{"error":"port is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Strictly validate port to prevent command injection via docker run -p.
+	portNum, err := strconv.Atoi(req.Port)
+	if err != nil || portNum < 1024 || portNum > 65535 {
+		http.Error(w, `{"error":"port must be a number between 1024 and 65535"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -79,6 +87,13 @@ func (h *AppsHandler) DeploySearXNG(w http.ResponseWriter, r *http.Request) {
 
 	if req.Port == "" {
 		http.Error(w, `{"error":"port is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Strictly validate port to prevent command injection via docker run -p.
+	portNum2, err2 := strconv.Atoi(req.Port)
+	if err2 != nil || portNum2 < 1024 || portNum2 > 65535 {
+		http.Error(w, `{"error":"port must be a number between 1024 and 65535"}`, http.StatusBadRequest)
 		return
 	}
 

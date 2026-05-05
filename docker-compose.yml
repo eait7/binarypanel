@@ -12,7 +12,9 @@ services:
       - ./caddy_config:/etc/caddy
       - ./caddy_data:/data
     environment:
-      - CADDY_ADMIN=0.0.0.0:2019
+      # Caddy admin API bound to container-internal address only.
+      # The dashboard reaches it via the Docker network name 'caddy:2019'.
+      - CADDY_ADMIN=localhost:2019
     networks:
       - binarypanel
 
@@ -22,7 +24,8 @@ services:
     container_name: binarypanel-filebrowser
     restart: unless-stopped
     ports:
-      - "8090:80"
+      # Bound to localhost only — accessible via SSH tunnel, not the public internet.
+      - "127.0.0.1:8090:80"
     volumes:
       - ./storage:/srv
       - ./filebrowser/.filebrowser.json:/.filebrowser.json
@@ -36,7 +39,8 @@ services:
     container_name: binarypanel-portainer
     restart: unless-stopped
     ports:
-      - "9443:9443"
+      # Bound to localhost only — accessible via SSH tunnel, not the public internet.
+      - "127.0.0.1:9443:9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./portainer_data:/data
@@ -59,6 +63,7 @@ services:
       - BINARYPANEL_SECRET=${BINARYPANEL_SECRET:-changeme-in-production}
       - BINARYPANEL_USERNAME=${BINARYPANEL_USERNAME:-admin}
       - BINARYPANEL_PASSWORD=${BINARYPANEL_PASSWORD:-admin}
+      - BINARYPANEL_HTTPS=${BINARYPANEL_HTTPS:-false}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./dashboard_data:/data
