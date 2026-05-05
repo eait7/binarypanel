@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -181,12 +180,6 @@ func (s *CaddyService) ListDomains() ([]DomainInfo, error) {
 
 // AddSite adds a new domain/site to Caddy's configuration.
 func (s *CaddyService) AddSite(domain, upstream, handlerType string) error {
-	// Translate 'localhost' to the Docker bridge gateway so Caddy (inside its
-	// own container) can reach services running on the host or other containers
-	// that expose ports on the host. The binarypanel network gateway is 172.28.0.1.
-	upstream = strings.ReplaceAll(upstream, "localhost:", "172.28.0.1:")
-	upstream = strings.ReplaceAll(upstream, "127.0.0.1:", "172.28.0.1:")
-
 	var handler map[string]interface{}
 	if handlerType == "file_server" {
 		handler = map[string]interface{}{

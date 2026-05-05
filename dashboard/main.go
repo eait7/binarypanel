@@ -51,10 +51,15 @@ func main() {
 		if saved, err := domainStore.Load(); err == nil && len(saved) > 0 {
 			logger.Info("domains", fmt.Sprintf("Restoring %d domain(s) to Caddy...", len(saved)))
 			for _, d := range saved {
-				if err := caddySvc.AddSite(d.Domain, d.Upstream, d.Type); err != nil {
+				// Intelligent resolution for legacy localhost upstreams
+				resolvedUpstream := d.Upstream
+				if dockerSvc != nil {
+					resolvedUpstream = dockerSvc.ResolveUpstream(d.Upstream)
+				}
+				if err := caddySvc.AddSite(d.Domain, resolvedUpstream, d.Type); err != nil {
 					logger.Warn("domains", fmt.Sprintf("Could not restore %s: %v", d.Domain, err))
 				} else {
-					logger.Info("domains", "Restored: "+d.Domain+" → "+d.Upstream)
+					logger.Info("domains", "Restored: "+d.Domain+" → "+resolvedUpstream)
 				}
 			}
 		}

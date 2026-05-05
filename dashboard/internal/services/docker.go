@@ -119,6 +119,39 @@ func (s *DockerService) ListContainers() ([]ContainerInfo, error) {
 	return result, nil
 }
 
+// ResolveUpstream automatically converts host loopback addresses (localhost:PORT or 127.0.0.1:PORT)
+// into the internal Docker container name that exposes that port (e.g., container_name:PORT).
+// This is required because Caddy (in a container) cannot easily route to host-mapped ports
+// on the same bridge network due to Docker's default NAT hairpin firewall rules.
+func (s *DockerService) ResolveUpstream(upstream string) string {
+	if !strings.HasPrefix(upstream, "localhost:") && !strings.HasPrefix(upstream, "127.0.0.1:") {
+		return upstream
+	}
+	parts := strings.Split(upstream, ":")
+	if len(parts) != 2 {
+		return upstream
+	}
+	port := parts[1]
+
+	containers, err := s.ListContainers()
+	if err != nil {
+		return upstream
+	}
+
+	for _, c := range containers {
+		for _, p := range c.Ports {
+			if fmt.Sprintf("%d", p.Public) == port && c.Name != "" {
+				// We found the container mapping this port!
+				// Return its internal Docker DNS name and the PRIVATE port.
+				// Wait, if it maps 8080:80, the private port is 80!
+				// So we should return c.Name + ":" + p.Private.
+				return fmt.Sprintf("%s:%d", c.Name, p.Private)
+			}
+		}
+	}
+	return upstream
+}
+
 // StartContainer starts a stopped container.
 func (s *DockerService) StartContainer(id string) error {
 	resp, err := s.client.Post(

@@ -76,6 +76,13 @@ func (h *DomainsHandler) Add(w http.ResponseWriter, r *http.Request) {
 		req.Type = "reverse_proxy"
 	}
 
+	// Smart upstream resolution:
+	// If the user entered "localhost:8080", we resolve it to the internal Docker container
+	// (e.g. binarycms_123:80) to bypass Docker's bridge NAT hairpin routing restrictions.
+	if h.docker != nil {
+		req.Upstream = h.docker.ResolveUpstream(req.Upstream)
+	}
+
 	if err := h.caddy.AddSite(req.Domain, req.Upstream, req.Type); err != nil {
 		if logger := getLogger(); logger != nil {
 			diag := services.DiagnoseCaddyError(err)
