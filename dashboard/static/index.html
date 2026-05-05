@@ -502,13 +502,13 @@
 
                 <!-- 1-Click OS Update -->
                 <div class="card" style="flex:1; min-width:600px;">
-                    <h3 class="card-title">Self-Compiling System Updater</h3>
-                    <p class="form-hint" style="margin-bottom: 20px;">Sync BinaryPanel cleanly against the external GitHub origin utilizing the detached engine orchestrator.</p>
+                    <h3 class="card-title">Update BinaryPanel</h3>
+                    <p class="form-hint" style="margin-bottom: 20px;">Pull the latest version from GitHub and restart all services. Your data and containers are not affected.</p>
                     <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                         <p style="font-size: 0.875rem; color: #fca5a5; margin:0;"><strong>Warning:</strong> Deploying an organic update commands the container daemon to structurally rebuild itself in memory! The dashboard socket will permanently sever instantly upon clicking until the native rebuild fully reinstantiates itself securely in ~30 seconds.</p>
+                         <p style="font-size: 0.875rem; color: #fca5a5; margin:0;"><strong>Heads up:</strong> BinaryPanel will pull the latest code from GitHub and restart all services. The page disconnects for ~45 seconds then reconnects automatically.</p>
                     </div>
                     <button type="button" class="btn btn-primary" id="system-update-btn">
-                         <span class="btn-text">🚀 Check & Compel Updates natively</span>
+                         <span class="btn-text">🚀 Check for Updates & Apply</span>
                          <span class="btn-loader" style="display:none"></span>
                     </button>
                     <p id="system-update-status" style="margin-top:0.5rem; font-size:0.875rem;"></p>
@@ -517,9 +517,9 @@
                 <!-- System Reboot -->
                 <div class="card" style="flex:1; min-width:300px;">
                     <h3 class="card-title">System Service Manager</h3>
-                    <p class="form-hint" style="margin-bottom: 20px;">Restart all BinaryPanel containers to resolve networking issues, DNS failures, or stale connections.</p>
+                    <p class="form-hint" style="margin-bottom: 20px;">Restart all BinaryPanel services (Caddy, Dashboard, FileBrowser) to apply config changes or fix connection issues.</p>
                     <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                         <p style="font-size: 0.875rem; color: #fcd34d; margin:0;"><strong>Note:</strong> This will restart all services (Caddy, Dashboard, FileBrowser). The dashboard will temporarily disconnect and auto-reconnect in ~15 seconds.</p>
+                         <p style="font-size: 0.875rem; color: #fcd34d; margin:0;"><strong>Note:</strong> All services will restart and apply the latest configuration. The dashboard will reconnect automatically in about 30 seconds.</p>
                     </div>
                     <div style="display: flex; gap: 12px; flex-wrap: wrap;">
                         <button type="button" class="btn btn-danger" id="system-reboot-btn">
@@ -556,19 +556,19 @@
         <header class="section-header">
             <div>
                 <h2>App Store (1-Click Installs)</h2>
-                <p>Deploy persistent multi-tier web applications and stacks natively with a single click.</p>
+                 <p>Deploy apps with one click. After deploying, go to <strong>Domains</strong> to link your domain name.</p>
             </div>
         </header>
 
         <div class="card" style="max-width: 600px;">
             <h3 class="card-title">BinaryCMS</h3>
-            <p style="color: #94a3b8; font-size: 0.875rem; margin-bottom: 1.5rem; line-height: 1.5;">A hyper-optimized, native Go architecture combining high-performance API structures with a completely unified SQLite datastore perfectly suited for isolated container orchestration.</p>
+            <p style="color: #94a3b8; font-size: 0.875rem; margin-bottom: 1.5rem; line-height: 1.5;">A fast, lightweight CMS built in Go. After deploying, link your domain in the <strong>Domains</strong> tab using <code>localhost:PORT</code> as the upstream — where PORT is the number you choose below.</p>
             
             <form id="app-deploy-form" style="display: flex; gap: 1rem; align-items: flex-end;">
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label>Internal Target Port</label>
-                    <input type="number" id="app-deploy-port" placeholder="8081" required style="width: 150px;">
-                </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Port (e.g. 8081) — you'll use this in Domains → Upstream</label>
+                        <input type="number" id="app-deploy-port" placeholder="8081" required style="width: 150px;">
+                    </div>
                 <button type="submit" id="app-deploy-btn" class="btn btn-primary" style="margin-bottom: 0px;">
                     <span class="btn-text">🚀 1-Click Deploy</span>
                     <span class="btn-loader" style="display:none"></span>
@@ -613,7 +613,7 @@
             <div class="form-group">
                 <label for="domain-name">Domain Name</label>
                 <input type="text" id="domain-name" placeholder="example.com" required>
-                <span class="form-hint">SSL certificate will be provisioned automatically via Let's Encrypt</span>
+                <span class="form-hint">HTTPS is automatic — Caddy gets the certificate for you via Let's Encrypt</span>
             </div>
             <div class="form-group">
                 <label for="domain-type">Handler Type</label>
@@ -625,7 +625,7 @@
             <div class="form-group">
                 <label for="domain-upstream" id="domain-upstream-label">Upstream (host:port)</label>
                 <input type="text" id="domain-upstream" placeholder="localhost:8080" required>
-                <span class="form-hint" id="domain-upstream-hint">The backend server to proxy requests to</span>
+                <span class="form-hint" id="domain-upstream-hint">The port your app is running on — e.g. <code>localhost:8080</code> for BinaryCMS on port 8080</span>
             </div>
             <input type="hidden" id="domain-edit-id" value="">
             <div class="modal-actions">

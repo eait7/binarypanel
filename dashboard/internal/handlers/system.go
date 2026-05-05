@@ -64,12 +64,13 @@ func (h *SystemHandler) UpdateSystem(w http.ResponseWriter, r *http.Request) {
 	preHash, _ := exec.Command("sh", "-c",
 		"cd /app/host_binarypanel && git rev-parse --short HEAD 2>/dev/null").Output()
 
-	// Dispatch detached background compilation sequence.
+	// Pull latest code from GitHub and fully recreate all containers.
+	// force-recreate ensures new network config, IPs and env vars always apply.
 	cmd := exec.Command("sh", "-c",
 		"cd /app/host_binarypanel && "+
 			"git config --global --add safe.directory /app/host_binarypanel && "+
 			"git pull origin main && "+
-			"docker compose up -d --build --force-recreate dashboard &")
+			"docker compose up -d --build --force-recreate &")
 	if err := cmd.Start(); err != nil {
 		if h.logger != nil {
 			h.logger.Error("system", "System update failed to start", err.Error())
@@ -85,7 +86,7 @@ func (h *SystemHandler) UpdateSystem(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "Update triggered successfully. Dashboard will detach and completely reset organically in ~30 seconds.",
+		"message": "Update started. BinaryPanel is pulling the latest version and restarting all services. This takes about 45 seconds — the page will reconnect automatically.",
 	})
 }
 
