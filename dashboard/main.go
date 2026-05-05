@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"binarypanel/internal/config"
 	"binarypanel/internal/handlers"
@@ -175,11 +176,30 @@ func main() {
 		),
 	)
 
-	addr := fmt.Sprintf(":%s", cfg.Port)
+	addr := fmt.Sprintf("127.0.0.1:%s", cfg.Port)
 	log.Printf("🚀 BinaryPanel Dashboard starting on %s", addr)
 	log.Printf("   Caddy API: %s", cfg.CaddyAPI)
 	log.Printf("   FileBrowser: %s", cfg.FileBrowserURL)
 	log.Printf("   Portainer: %s", cfg.PortainerExternalURL)
+
+	// Auto-register the panel domain in Caddy with HTTPS if PANEL_DOMAIN is set.
+	// This ensures BinaryPanel is only accessible over HTTPS — never plain HTTP.
+	if panelDomain := os.Getenv("PANEL_DOMAIN"); panelDomain != "" {
+		caddySvc := services.NewCaddyService(cfg.CaddyAPI)
+		go func() {
+			// Wait for Caddy to be fully ready.
+			time.Sleep(3 * time.Second)
+			if err := caddySvc.EnsurePanelRoute(panelDomain, fmt.Sprintf("localhost:%s", cfg.Port)); err != nil {
+				log.Printf("⚠️  Could not register panel domain %s in Caddy: %v", panelDomain, err)
+				log.Printf("   You can still access BinaryPanel via SSH tunnel on port %s", cfg.Port)
+			} else {
+				log.Printf("✅ BinaryPanel accessible at https://%s", panelDomain)
+			}
+		}()
+	} else {
+		log.Printf("ℹ️  Tip: Set PANEL_DOMAIN=panel.yourdomain.com to enable HTTPS for BinaryPanel")
+	}
+
 	log.Fatal(http.ListenAndServe(addr, handler))
 }
 

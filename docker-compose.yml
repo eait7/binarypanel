@@ -53,10 +53,15 @@ services:
     container_name: binarypanel-dashboard
     restart: unless-stopped
     ports:
-      - "9000:9000"
+      # Bound to localhost — NOT accessible from the public internet.
+      # Access via https://PANEL_DOMAIN (Caddy proxy) or SSH tunnel.
+      - "127.0.0.1:9000:9000"
     environment:
       # Static IP of the caddy container — no DNS required, always reachable
       - CADDY_API=http://172.28.0.10:2019
+      # Set PANEL_DOMAIN to your subdomain (e.g. panel.binarycms.com) to enable
+      # automatic HTTPS for BinaryPanel via Caddy. Caddy will get the SSL cert.
+      - PANEL_DOMAIN=${PANEL_DOMAIN:-}
       - PORTAINER_URL=https://portainer:9443
       - FILEBROWSER_URL=http://localhost:8090
       - PORTAINER_EXTERNAL_URL=https://localhost:9443

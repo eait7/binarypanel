@@ -505,3 +505,24 @@ func (s *CaddyService) ApplySecurityConfig(routeIndex int, cfg DomainSecurityCon
 
 	return nil
 }
+
+// EnsurePanelRoute idempotently registers BinaryPanel's own subdomain in Caddy.
+// Called on startup when PANEL_DOMAIN env var is set. Safe to call multiple times.
+func (s *CaddyService) EnsurePanelRoute(domain, upstream string) error {
+	// Check if the domain is already configured so we don't duplicate it.
+	domains, err := s.ListDomains()
+	if err != nil {
+		// Caddy might still be starting; treat as non-fatal.
+		return fmt.Errorf("could not list domains: %w", err)
+	}
+	for _, d := range domains {
+		for _, h := range d.Domains {
+			if h == domain {
+				// Already registered — nothing to do.
+				return nil
+			}
+		}
+	}
+	// Register the panel domain as a reverse-proxy route with TLS (Caddy handles cert).
+	return s.AddSite(domain, upstream, "reverse_proxy")
+}
