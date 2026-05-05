@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -180,8 +181,11 @@ func (s *CaddyService) ListDomains() ([]DomainInfo, error) {
 
 // AddSite adds a new domain/site to Caddy's configuration.
 func (s *CaddyService) AddSite(domain, upstream, handlerType string) error {
-	// First, ensure we have the base server config
-	s.ensureServerExists()
+	// Translate 'localhost' to the Docker bridge gateway so Caddy (inside its
+	// own container) can reach services running on the host or other containers
+	// that expose ports on the host. The binarypanel network gateway is 172.28.0.1.
+	upstream = strings.ReplaceAll(upstream, "localhost:", "172.28.0.1:")
+	upstream = strings.ReplaceAll(upstream, "127.0.0.1:", "172.28.0.1:")
 
 	var handler map[string]interface{}
 	if handlerType == "file_server" {
@@ -215,33 +219,106 @@ func (s *CaddyService) AddSite(domain, upstream, handlerType string) error {
 		"terminal": true,
 	}
 
+	// Add to HTTPS server (srv_domains on :443 and :80) — Let's Encrypt handles certs.
+	if err := s.ensureDomainServerExists(); err == nil {
+		s.prependRoute("srv_domains", route)
+	}
+
+	// Prepend to srv0 so domain routes fire BEFORE the catch-all default.
 	body, err := json.Marshal(route)
 	if err != nil {
 		return fmt.Errorf("failed to marshal route: %w", err)
 	}
 
-	resp, err := s.client.Post(
-		s.apiURL+"/config/apps/http/servers/srv0/routes",
-		"application/json",
+	if err := s.prependRoute("srv0", route); err != nil {
+		// Fallback: append
+		resp, err2 := s.client.Post(
+			s.apiURL+"/config/apps/http/servers/srv0/routes",
+			"application/json",
+			bytes.NewReader(body),
+		)
+		if err2 != nil {
+			return fmt.Errorf("failed to add site: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			respBody, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("caddy error (%d): %s", resp.StatusCode, string(respBody))
+		}
+	}
+
+	return nil
+}
+
+// prependRoute inserts a route at position 0 of the named server's routes list,
+// ensuring it fires before any catch-all default routes.
+func (s *CaddyService) prependRoute(serverName string, route map[string]interface{}) error {
+	// GET current routes
+	resp, err := s.client.Get(fmt.Sprintf("%s/config/apps/http/servers/%s/routes", s.apiURL, serverName))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	var routes []interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&routes); err != nil {
+		routes = []interface{}{}
+	}
+
+	// Prepend our route
+	routes = append([]interface{}{route}, routes...)
+
+	body, err := json.Marshal(routes)
+	if err != nil {
+		return err
+	}
+
+	// PUT full routes array back
+	req, err := http.NewRequest("PUT",
+		fmt.Sprintf("%s/config/apps/http/servers/%s/routes", s.apiURL, serverName),
 		bytes.NewReader(body),
 	)
 	if err != nil {
-		if logger := GetLogger(); logger != nil {
-			diag := DiagnoseCaddyError(err)
-			logger.Error("caddy", fmt.Sprintf("Failed to add site '%s' -> '%s': %v", domain, upstream, err), diag)
-		}
-		return fmt.Errorf("failed to add site: %w", err)
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp2, err := s.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode >= 400 {
+		body2, _ := io.ReadAll(resp2.Body)
+		return fmt.Errorf("caddy PUT routes error (%d): %s", resp2.StatusCode, string(body2))
+	}
+	return nil
+}
+
+// ensureDomainServerExists creates the srv_domains server (port 80+443) if missing.
+// This server is where user domains with Let's Encrypt certs live.
+func (s *CaddyService) ensureDomainServerExists() error {
+	resp, err := s.client.Get(s.apiURL + "/config/apps/http/servers/srv_domains")
+	if err != nil {
+		return err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(resp.Body)
-		if logger := GetLogger(); logger != nil {
-			logger.Error("caddy", fmt.Sprintf("Caddy rejected site add for '%s' (HTTP %d): %s", domain, resp.StatusCode, string(respBody)))
-		}
-		return fmt.Errorf("caddy error (%d): %s", resp.StatusCode, string(respBody))
+	if resp.StatusCode != 404 {
+		return nil // already exists
 	}
-
+	server := map[string]interface{}{
+		"listen": []string{":443", ":80"},
+		"routes": []interface{}{},
+	}
+	body, _ := json.Marshal(server)
+	req, _ := http.NewRequest("PUT",
+		s.apiURL+"/config/apps/http/servers/srv_domains",
+		bytes.NewReader(body),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	resp2, err := s.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp2.Body.Close()
 	return nil
 }
 
