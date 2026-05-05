@@ -219,9 +219,32 @@ func (s *CaddyService) AddSite(domain, upstream, handlerType string) error {
 		"terminal": true,
 	}
 
-	// Add to HTTPS server (srv_domains on :443 and :80) — Let's Encrypt handles certs.
+	// Add to HTTPS server (srv_domains on :443) — Let's Encrypt handles certs.
 	if err := s.ensureDomainServerExists(); err == nil {
 		s.prependRoute("srv_domains", route)
+	}
+
+	// Prepend to srv0 so domain routes fire BEFORE the catch-all default on port 80.
+	body, err := json.Marshal(route)
+	if err != nil {
+		return fmt.Errorf("failed to marshal route: %w", err)
+	}
+
+	if err := s.prependRoute("srv0", route); err != nil {
+		// Fallback: append
+		resp, err2 := s.client.Post(
+			s.apiURL+"/config/apps/http/servers/srv0/routes",
+			"application/json",
+			bytes.NewReader(body),
+		)
+		if err2 != nil {
+			return fmt.Errorf("failed to add site: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			respBody, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("caddy error (%d): %s", resp.StatusCode, string(respBody))
+		}
 	}
 
 	return nil
@@ -265,12 +288,12 @@ func (s *CaddyService) prependRoute(serverName string, route map[string]interfac
 	defer resp2.Body.Close()
 	if resp2.StatusCode >= 400 {
 		body2, _ := io.ReadAll(resp2.Body)
-		return fmt.Errorf("caddy PUT routes error (%d): %s", resp2.StatusCode, string(body2))
+		return fmt.Errorf("caddy PATCH routes error (%d): %s", resp2.StatusCode, string(body2))
 	}
 	return nil
 }
 
-// ensureDomainServerExists creates the srv_domains server (port 80+443) if missing.
+// ensureDomainServerExists creates the srv_domains server (port 443) if missing.
 // This server is where user domains with Let's Encrypt certs live.
 func (s *CaddyService) ensureDomainServerExists() error {
 	resp, err := s.client.Get(s.apiURL + "/config/apps/http/servers/srv_domains")
@@ -282,7 +305,7 @@ func (s *CaddyService) ensureDomainServerExists() error {
 		return nil // already exists
 	}
 	server := map[string]interface{}{
-		"listen": []string{":443", ":80"},
+		"listen": []string{":443"},
 		"routes": []interface{}{},
 	}
 	body, _ := json.Marshal(server)
