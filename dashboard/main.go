@@ -198,7 +198,7 @@ func main() {
 		),
 	)
 
-	addr := fmt.Sprintf("127.0.0.1:%s", cfg.Port)
+	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("🚀 BinaryPanel Dashboard starting on %s", addr)
 	log.Printf("   Caddy API: %s", cfg.CaddyAPI)
 	log.Printf("   FileBrowser: %s", cfg.FileBrowserURL)
