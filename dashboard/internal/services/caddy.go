@@ -224,29 +224,6 @@ func (s *CaddyService) AddSite(domain, upstream, handlerType string) error {
 		s.prependRoute("srv_domains", route)
 	}
 
-	// Prepend to srv0 so domain routes fire BEFORE the catch-all default.
-	body, err := json.Marshal(route)
-	if err != nil {
-		return fmt.Errorf("failed to marshal route: %w", err)
-	}
-
-	if err := s.prependRoute("srv0", route); err != nil {
-		// Fallback: append
-		resp, err2 := s.client.Post(
-			s.apiURL+"/config/apps/http/servers/srv0/routes",
-			"application/json",
-			bytes.NewReader(body),
-		)
-		if err2 != nil {
-			return fmt.Errorf("failed to add site: %w", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode >= 400 {
-			respBody, _ := io.ReadAll(resp.Body)
-			return fmt.Errorf("caddy error (%d): %s", resp.StatusCode, string(respBody))
-		}
-	}
-
 	return nil
 }
 
